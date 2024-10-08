@@ -1,0 +1,11 @@
+# MacOS
+**/.DS_Store
+
+# User configuration
+**/.idea/
+**/.vscode/
+/devl/teams/**/http-client.private.env.json
+
+# allow committing selected config files using child gitignore
+!**/.idea/.gitignore
+!**/.vscode/.gitignore
