@@ -108,38 +108,41 @@ jobs:
 
       - name: Handle PR creation or clean merge
         run: |
-          if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
-            PR_LIST=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.[] | "#\(.number)"')
-            DESCRIPTION="Depends on: $PR_LIST"
-            
-            echo "PR_LIST: $PR_LIST"
-            echo "DESCRIPTION: $DESCRIPTION"
+          # Fetch the latest changes from both main and main-v3 branches
+          git fetch origin main main-v3
 
-            gh pr create \
-              --base main-v3 \
-              --head "${{ env.BRANCH_NAME }}" \
-              --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
-              --body "$DESCRIPTION" \
-              --draft
+          # Checkout the main-v3 branch
+          git checkout main-v3
 
-            gh pr edit "${{ env.BRANCH_NAME }}" --add-label "DO NOT MERGE"
-          else
-            # Clean merge process
-            git fetch origin main-v3
-            if git merge origin/main-v3 --no-commit --no-ff; then
-              echo "⏩ No conflicts, proceeding with direct merge."
-              git commit -m "Merging ${{ env.BRANCH_NAME }} to main-v3"
+          # Attempt to merge main into main-v3
+          if git merge origin/main --no-commit --no-ff; then
+            # Check the status of the merge to see if there are changes to commit
+            if [ "$(git diff --stat --cached)" != "" ]; then
+              echo "⏩ Changes detected, proceeding with direct merge."
+              git commit -m "Merging changes from main to main-v3"
               git push origin main-v3
               echo "✅ Successfully merged to main-v3"
-              git push origin --delete ${{ env.BRANCH_NAME }}
             else
-              echo "🚫 Merge conflicts detected, creating PR for manual resolution."
-              gh pr create \
-                --base main-v3 \
-                --head "${{ env.BRANCH_NAME }}" \
-                --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
-                --body "Merge conflicts detected, needs manual resolution."
+              echo "ℹ️ No changes to merge; nothing to commit."
             fi
+          else
+            # If there are merge conflicts, notify and create a PR for manual resolution
+            echo "🚫 Merge conflicts detected, creating PR for manual resolution."
+            # Create a temporary branch for the PR
+            TEMP_BRANCH="conflict-resolution-branch"
+            git checkout -b "$TEMP_BRANCH"
+
+            # Push the temporary branch to the remote
+            git push origin "$TEMP_BRANCH"
+
+            # Create a pull request for the merge conflicts
+            gh pr create \
+              --base main-v3 \
+              --head "$TEMP_BRANCH" \
+              --title "Merge conflicts detected - manual resolution needed" \
+              --body "Merge conflicts occurred while attempting to merge changes from main to main-v3. Please resolve them in this PR."
+
+            echo "✅ Pull request created for manual resolution."
           fi
 
       - name: Merge resolution instruction
