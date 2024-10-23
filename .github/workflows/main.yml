@@ -32,6 +32,8 @@ jobs:
 
       - name: List all open PRs to main-v3
         id: list-open-prs
+        env:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch all open PRs targeting main-v3 from main
           OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
