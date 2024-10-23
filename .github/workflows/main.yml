@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - 'main'
-    paths-ignore:
-      - .github/
 
 jobs:
   merge-pr-to-main-v3:
