@@ -92,7 +92,17 @@ jobs:
           echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
 
       - name: Handle multiple open PRs
-        if: ${{ fromJSON(env.OPEN_PR_COUNT) > 1 }}
+        run: |
+          if [ ${{ env.OPEN_PR_COUNT }} -gt 1 ]; then
+            echo "Multiple open PRs found, proceeding to create a draft PR."
+            echo "MULTIPLE_OPEN_PRS=true" >> $GITHUB_ENV
+          else
+            echo "Only one or no open PRs found."
+            echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Handle multiple open PRs
+        if: ${{ env.MULTIPLE_OPEN_PRS == 'true' }}
         run: |
           PR_LIST=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.[] | "#\(.number)"')
           DESCRIPTION="Depends on: $PR_LIST"
@@ -108,7 +118,7 @@ jobs:
             --add-label "DO NOT MERGE"
 
       - name: Clean merge or create new PR
-        if: ${{ fromJSON(env.OPEN_PR_COUNT) == 1 }}
+        if: ${{ env.MULTIPLE_OPEN_PRS == 'false' }}
         run: |
           # Attempt a clean merge
           git fetch origin main-v3
