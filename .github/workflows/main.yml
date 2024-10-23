@@ -118,26 +118,28 @@ jobs:
       - name: Clean merge or create new PR
         if: ${{ env.MULTIPLE_OPEN_PRS == 'false' }}
         run: |
-          # Attempt a clean merge
+          # Attempt to fetch the latest main-v3 branch
           git fetch origin main-v3
-          git merge origin/main-v3 --no-commit --no-ff || echo "Merge conflict"
-
-          if git diff --quiet; then
+          
+          # Attempt a clean merge
+          if git merge origin/main-v3 --no-commit --no-ff; then
             # No conflicts, proceed with direct merge
+            echo "⏩ No conflicts, proceed with direct merge"
             git commit -m "Merging ${{ env.BRANCH_NAME }} to main-v3"
             git push origin main-v3
-
-            echo "✅ Successfully merged "
-
-            # Delete the branch
+            echo "✅ Successfully merged to main-v3"
+          
+            # Delete the branch after successful merge
             git push origin --delete ${{ env.BRANCH_NAME }}
           else
             # If conflicts exist, create a PR for manual resolution
+            echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             gh pr create \
               --base main-v3 \
               --head "${{ env.BRANCH_NAME }}" \
               --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
               --body "Merge conflicts detected, needs manual resolution."
+          fi
 
       - name: Merge resolution instruction
         if: failure()
