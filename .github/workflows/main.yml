@@ -1,0 +1,135 @@
+name: Main CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    paths-ignore:
+      - .github/
+
+jobs:
+  merge-pr-to-main-v3:
+    name: Merge the PR into main-v3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the PR branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch all history to access previous commits
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "${{ github.event.pull_request.user.login }}"
+          git config --global user.email "${{ github.event.pull_request.user.email }}"
+
+      - name: Identify the merge PR from commit message
+        id: pr-info
+        run: |
+          # Extract PR number from the merge commit title if it exists
+          PR_NUMBER=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' || echo "")
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+
+      - name: List all open PRs to main-v3
+        id: list-open-prs
+        run: |
+          # Fetch all open PRs targeting main-v3 from main
+          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
+          echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
+          echo "Open PRs to main-v3: $OPEN_PRS"
+
+      - name: Create a new branch for merge
+        id: create-branch
+        run: |
+          # Max branch name length allowed by Git is 255 characters.
+          MAX_LENGTH=255
+
+          # Fetch the author's name, sanitize, and trim it to a readable length
+          AUTHOR_NAME=$(git log -1 --pretty=format:'%an' | sed 's/ /-/g' | cut -c1-20) # Trim to 20 chars for readability
+
+          # Get short commit hash (7 characters for brevity)
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+
+          # Check if there's a PR number, otherwise generate a branch name using commit hash and timestamp
+          if [ -n "${{ env.PR_NUMBER }}" ]; then
+            BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/pr-${{ env.PR_NUMBER }}"
+          else
+            # Use commit hash and timestamp if there's no PR number
+            TIMESTAMP=$(date +'%Y%m%d-%H%M')
+            BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/${COMMIT_HASH}-${TIMESTAMP}"
+          fi
+
+          # Ensure the branch name doesn't exceed 255 characters
+          if [ ${#BRANCH_NAME} -gt $MAX_LENGTH ]; then
+            BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-$MAX_LENGTH)
+          fi
+
+          # Check if the branch already exists on the remote
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME already exists. Deleting the branch to start fresh."
+            # Delete the remote branch
+            git push origin --delete "$BRANCH_NAME"
+          fi
+
+          # Create the new branch locally
+          git checkout -b "$BRANCH_NAME"
+
+          # Push the new branch to the remote
+          git push origin "$BRANCH_NAME"
+
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+      - name: Push the new branch
+        run: |
+          git push origin ${{ env.BRANCH_NAME }}
+
+      - name: Determine number of open PRs
+        id: check-prs
+        run: |
+          OPEN_PR_COUNT=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '. | length')
+          echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
+
+      - name: Handle multiple open PRs
+        if: ${{ fromJSON(env.OPEN_PR_COUNT) > 1 }}
+        run: |
+          PR_LIST=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.[] | "#\(.number)"')
+          DESCRIPTION="Depends on: $PR_LIST"
+
+          gh pr create \
+            --base main-v3 \
+            --head "${{ env.BRANCH_NAME }}" \
+            --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
+            --body "$DESCRIPTION" \
+            --draft
+
+          gh pr edit "${{ env.BRANCH_NAME }}" \
+            --add-label "DO NOT MERGE"
+
+      - name: Clean merge or create new PR
+        if: ${{ fromJSON(env.OPEN_PR_COUNT) == 1 }}
+        run: |
+          # Attempt a clean merge
+          git fetch origin main-v3
+          git merge origin/main-v3 --no-commit --no-ff || echo "Merge conflict"
+
+          if git diff --quiet; then
+            # No conflicts, proceed with direct merge
+            git commit -m "Merging ${{ env.BRANCH_NAME }} to main-v3"
+            git push origin main-v3
+
+            echo "✅ Successfully merged "
+
+            # Delete the branch
+            git push origin --delete ${{ env.BRANCH_NAME }}
+          else
+            # If conflicts exist, create a PR for manual resolution
+            gh pr create \
+              --base main-v3 \
+              --head "${{ env.BRANCH_NAME }}" \
+              --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
+              --body "Merge conflicts detected, needs manual resolution."
+
+      - name: Merge resolution instruction
+        if: failure()
+        run: |
+          echo "⛙ Merge conflicts must be resolved manually. PR created for branch ${{ env.BRANCH_NAME }}."
