@@ -118,6 +118,21 @@ jobs:
       - name: Clean merge or create new PR
         if: ${{ env.MULTIPLE_OPEN_PRS == 'false' }}
         run: |
+          # Check if the event is a pull request
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Set user info for direct pushes to main
+            USER_NAME="${{ github.actor }}"
+            USER_EMAIL="${{ github.actor }}@users.noreply.github.com"  # Default email format
+          else
+            # Set user info for pull request
+            USER_NAME="${{ github.event.pull_request.user.login }}"
+            USER_EMAIL="${{ github.event.pull_request.user.email }}"
+          fi
+      
+          # Configure Git
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$USER_EMAIL"
+          
           # Attempt to fetch the latest main-v3 branch
           git fetch origin main-v3
           
