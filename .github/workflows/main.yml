@@ -16,23 +16,29 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history to access previous commits
 
-      - name: Set up Git
+      - name: Set up Git User Information
         run: |
-          git config --global user.name "${{ github.event.pull_request.user.login }}"
-          git config --global user.email "${{ github.event.pull_request.user.email }}"
+          # Check if the event is a pull request and set user info accordingly
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            USER_NAME="${{ github.event.pull_request.user.login }}"
+            USER_EMAIL="${{ github.event.pull_request.user.email }}"
+          else
+            USER_NAME="${{ github.actor }}"
+            USER_EMAIL="${{ github.actor }}@users.noreply.github.com"  # Default email format for direct commits
+          fi
+          git config --global user.name "$USER_NAME"
+          git config --global user.email "$USER_EMAIL"
 
       - name: Identify the PR number
         id: pr-info
         run: |
-          # Check if the event is a pull request
+          # Use the PR number directly from the event if available
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Use the pull request number directly from the event
             PR_NUMBER="${{ github.event.pull_request.number }}"
           else
             # Extract PR number from the merge commit title if it's a push event
             PR_NUMBER=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' || echo "")
-            # Remove the '#' character from the PR number if it exists
-            PR_NUMBER=${PR_NUMBER#"#"}
+            PR_NUMBER=${PR_NUMBER#"#"}  # Remove '#' character
           fi
           echo "PR_NUMBER: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
@@ -44,8 +50,8 @@ jobs:
         run: |
           # Fetch all open PRs targeting main-v3 from main
           OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
+          echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS"
           echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
-          echo "Open PRs to main-v3: $OPEN_PRS"
 
       - name: Create a new branch for merge
         id: create-branch
@@ -59,48 +65,37 @@ jobs:
           # Get short commit hash (7 characters for brevity)
           COMMIT_HASH=$(git rev-parse --short HEAD)
 
-          # Check if there's a PR number, otherwise generate a branch name using commit hash and timestamp
+          # Check if there's a PR number to generate branch name
           if [ -n "${{ env.PR_NUMBER }}" ]; then
             BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/pr-${{ env.PR_NUMBER }}"
           else
-            # Use commit hash and timestamp if there's no PR number
             TIMESTAMP=$(date +'%Y%m%d-%H%M')
             BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/${COMMIT_HASH}-${TIMESTAMP}"
           fi
 
-          # Ensure the branch name doesn't exceed 255 characters
-          if [ ${#BRANCH_NAME} -gt $MAX_LENGTH ]; then
-            BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-$MAX_LENGTH)
-          fi
+          # Ensure branch name does not exceed 255 characters
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-$MAX_LENGTH)
 
-          # Check if the branch already exists on the remote
+          # Delete existing branch if it already exists
           if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
             echo "Branch $BRANCH_NAME already exists. Deleting the branch to start fresh."
-            # Delete the remote branch
             git push origin --delete "$BRANCH_NAME"
           fi
           
-          echo "$BRANCH_NAME"
-
-          # Create the new branch locally
+          # Create and push the new branch
           git checkout -b "$BRANCH_NAME"
-
-          # Push the new branch to the remote
           git push origin "$BRANCH_NAME"
-
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-
-      - name: Push the new branch
-        run: |
-          git push origin ${{ env.BRANCH_NAME }}
 
       - name: Determine number of open PRs
         id: check-prs
         run: |
           OPEN_PR_COUNT=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '. | length')
+          echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
           echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
 
-      - name: Handle multiple open PRs
+      - name: Check for multiple open PRs
+        id: check-multiple-prs
         run: |
           if [ ${{ env.OPEN_PR_COUNT }} -gt 1 ]; then
             echo "Multiple open PRs found, proceeding to create a draft PR."
@@ -109,62 +104,42 @@ jobs:
             echo "Only one or no open PRs found."
             echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
           fi
+          echo "MULTIPLE_OPEN_PRS: ${{ env.MULTIPLE_OPEN_PRS }}"
 
-      - name: Handle multiple open PRs
-        if: ${{ env.MULTIPLE_OPEN_PRS == 'true' }}
+      - name: Handle PR creation or clean merge
         run: |
-          PR_LIST=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.[] | "#\(.number)"')
-          DESCRIPTION="Depends on: $PR_LIST"
+          if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
+            PR_LIST=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.[] | "#\(.number)"')
+            DESCRIPTION="Depends on: $PR_LIST"
+            
+            echo "PR_LIST: $PR_LIST"
+            echo "DESCRIPTION: $DESCRIPTION"
 
-          gh pr create \
-            --base main-v3 \
-            --head "${{ env.BRANCH_NAME }}" \
-            --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
-            --body "$DESCRIPTION" \
-            --draft
-
-          gh pr edit "${{ env.BRANCH_NAME }}" \
-            --add-label "DO NOT MERGE"
-
-      - name: Clean merge or create new PR
-        if: ${{ env.MULTIPLE_OPEN_PRS == 'false' }}
-        run: |
-          # Check if the event is a pull request
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Set user info for direct pushes to main
-            USER_NAME="${{ github.actor }}"
-            USER_EMAIL="${{ github.actor }}@users.noreply.github.com"  # Default email format
-          else
-            # Set user info for pull request
-            USER_NAME="${{ github.event.pull_request.user.login }}"
-            USER_EMAIL="${{ github.event.pull_request.user.email }}"
-          fi
-      
-          # Configure Git
-          git config --global user.name "$USER_NAME"
-          git config --global user.email "$USER_EMAIL"
-          
-          # Attempt to fetch the latest main-v3 branch
-          git fetch origin main-v3
-          
-          # Attempt a clean merge
-          if git merge origin/main-v3 --no-commit --no-ff; then
-            # No conflicts, proceed with direct merge
-            echo "⏩ No conflicts, proceed with direct merge"
-            git commit -m "Merging ${{ env.BRANCH_NAME }} to main-v3"
-            git push origin main-v3
-            echo "✅ Successfully merged to main-v3"
-          
-            # Delete the branch after successful merge
-            git push origin --delete ${{ env.BRANCH_NAME }}
-          else
-            # If conflicts exist, create a PR for manual resolution
-            echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             gh pr create \
               --base main-v3 \
               --head "${{ env.BRANCH_NAME }}" \
               --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
-              --body "Merge conflicts detected, needs manual resolution."
+              --body "$DESCRIPTION" \
+              --draft
+
+            gh pr edit "${{ env.BRANCH_NAME }}" --add-label "DO NOT MERGE"
+          else
+            # Clean merge process
+            git fetch origin main-v3
+            if git merge origin/main-v3 --no-commit --no-ff; then
+              echo "⏩ No conflicts, proceeding with direct merge."
+              git commit -m "Merging ${{ env.BRANCH_NAME }} to main-v3"
+              git push origin main-v3
+              echo "✅ Successfully merged to main-v3"
+              git push origin --delete ${{ env.BRANCH_NAME }}
+            else
+              echo "🚫 Merge conflicts detected, creating PR for manual resolution."
+              gh pr create \
+                --base main-v3 \
+                --head "${{ env.BRANCH_NAME }}" \
+                --title "Merge branch ${{ env.BRANCH_NAME }} to main-v3" \
+                --body "Merge conflicts detected, needs manual resolution."
+            fi
           fi
 
       - name: Merge resolution instruction
