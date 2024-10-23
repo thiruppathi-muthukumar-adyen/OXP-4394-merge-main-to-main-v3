@@ -21,11 +21,20 @@ jobs:
           git config --global user.name "${{ github.event.pull_request.user.login }}"
           git config --global user.email "${{ github.event.pull_request.user.email }}"
 
-      - name: Identify the merge PR from commit message
+      - name: Identify the PR number
         id: pr-info
         run: |
-          # Extract PR number from the merge commit title if it exists
-          PR_NUMBER=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' || echo "")
+          # Check if the event is a pull request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Use the pull request number directly from the event
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          else
+            # Extract PR number from the merge commit title if it's a push event
+            PR_NUMBER=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' || echo "")
+            # Remove the '#' character from the PR number if it exists
+            PR_NUMBER=${PR_NUMBER#"#"}
+          fi
+          echo "PR_NUMBER: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
 
       - name: List all open PRs to main-v3
@@ -70,6 +79,8 @@ jobs:
             # Delete the remote branch
             git push origin --delete "$BRANCH_NAME"
           fi
+          
+          echo "$BRANCH_NAME"
 
           # Create the new branch locally
           git checkout -b "$BRANCH_NAME"
