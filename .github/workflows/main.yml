@@ -170,8 +170,13 @@ jobs:
             # Create a pull request for the merge conflicts
           
             # Ensure the variables are properly sanitized for use in the command
+            echo "MERGE_BRANCH_URL: $MERGE_BRANCH_URL"
+            echo "PR_DESCRIPTION: $PR_DESCRIPTION"
             MERGE_BRANCH_URL_SAFE=$(echo "$MERGE_BRANCH_URL" | sed 's/"/\\"/g')   # Escape double quotes
             PR_DESCRIPTION_SAFE=$(echo "$PR_DESCRIPTION" | sed 's/"/\\"/g')       # Escape double quotes
+            
+            echo "MERGE_BRANCH_URL_SAFE: $MERGE_BRANCH_URL_SAFE"
+            echo "PR_DESCRIPTION_SAFE: $PR_DESCRIPTION_SAFE"
 
             gh pr create $DRAFT_FLAG \
             --base main-v3 \
