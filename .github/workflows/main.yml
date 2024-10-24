@@ -155,9 +155,9 @@ jobs:
             PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
             PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.
             
-            Please resolve the conflicts.
-            "
-          # Construct the PR description based on whether there are multiple open PRs
+            Please resolve the conflicts."
+            
+            # Construct the PR description based on whether there are multiple open PRs
             PR_DESCRIPTION=$(
               if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
                 # Replace commas with ", #" and prepend "#" to each PR number
@@ -171,6 +171,9 @@ jobs:
             echo "DRAFT_FLAG: $DRAFT_FLAG"
           
             # Create a pull request for the merge conflicts
+          
+            echo "gh pr create $DRAFT_FLAG --base main-v3 --head ${env.MERGE_BRANCH_NAME} --title \"$PR_TITLE\" --body \"$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION\""
+
             gh pr create $DRAFT_FLAG \
               --base main-v3 \
               --head ${{ env.MERGE_BRANCH_NAME }} \
