@@ -136,8 +136,9 @@ jobs:
           else
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
+            MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
             PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from ${{ env.MERGE_BRANCH_NAME }} to main-v3. \n\nPlease resolve the conflicts."
+            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.$'\n' Please resolve the conflicts."
             PR_DESCRIPTION=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "Depends on the PRs: ${{ env.OPEN_PRS_FOR_MAIN_V3 }}" || echo "")
 
             # Set the draft flag based on MULTIPLE_OPEN_PRS
@@ -148,7 +149,7 @@ jobs:
               --base main-v3 \
               --head ${{ env.MERGE_BRANCH_NAME }} \
               --title "$PR_TITLE" \
-              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE \n\n $PR_DESCRIPTION"
+              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $'\n' $PR_DESCRIPTION"
                $DRAFT_FLAG
 
             echo "✅ Pull request created for manual resolution."
