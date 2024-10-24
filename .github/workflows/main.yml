@@ -48,7 +48,6 @@ jobs:
           fi
           echo "PR_NUMBER: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-
       - name: List, Count, and Check Open PRs to main-v3
         id: list-count-check-prs
         run: |
@@ -66,12 +65,14 @@ jobs:
             echo "OPEN_PR_COUNT=0" >> $GITHUB_ENV
             echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
           else
-            # If there are open PRs, format and store them
-            echo "OPEN_PRS_FOR_MAIN_V3: [$OPEN_PRS]"
-            echo "OPEN_PRS_FOR_MAIN_V3=[$OPEN_PRS]" >> $GITHUB_ENV
+            # If there are open PRs, format them as a JSON array
+            # Using `jq` to create a proper JSON array from the list of PRs
+            OPEN_PRS_ARRAY=$(echo "$OPEN_PRS" | jq -R . | jq -s .)
+            echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS_ARRAY"
+            echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS_ARRAY" >> $GITHUB_ENV
           
             # Count the number of open PRs
-            OPEN_PR_COUNT=$(echo "$OPEN_PRS" | jq -r 'length')
+            OPEN_PR_COUNT=$(echo "$OPEN_PRS_ARRAY" | jq 'length')
             echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
             echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
 
