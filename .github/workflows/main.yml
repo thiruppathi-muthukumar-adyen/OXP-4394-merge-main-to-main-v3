@@ -88,9 +88,9 @@ jobs:
 
           # Log the final outputs for verification
           echo "FINAL OUTPUTS:"
-          echo "OPEN_PRS_FOR_MAIN_V3=${{ env.OPEN_PRS_FOR_MAIN_V3 }}"
-          echo "OPEN_PR_COUNT=${{ env.OPEN_PR_COUNT }}"
-          echo "MULTIPLE_OPEN_PRS=${{ env.MULTIPLE_OPEN_PRS }}"
+          echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS_FOR_MAIN_V3"
+          echo "OPEN_PR_COUNT=$OPEN_PR_COUNT"
+          echo "MULTIPLE_OPEN_PRS=$MULTIPLE_OPEN_PRS"
 
       - name: Create a new branch for merge
         id: create-branch
