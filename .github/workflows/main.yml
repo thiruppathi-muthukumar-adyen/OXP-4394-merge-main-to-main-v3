@@ -133,11 +133,11 @@ jobs:
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             # Create a temporary branch for the PR
-            TEMP_BRANCH="resolve-conflict-${{ env.MERGE_BRANCH_NAME }}"
-            git checkout -b "$TEMP_BRANCH"
+            MERGE_BRANCH_NAME="${{ env.MERGE_BRANCH_NAME }}"
+            git checkout -b "$MERGE_BRANCH_NAME"
 
             # Push the temporary branch to the remote
-            git push origin "$TEMP_BRANCH"
+            git push origin "$MERGE_BRANCH_NAME"
           
             git config --global user.name "$USER_NAME"
             git config --global user.email "$USER_EMAIL"
@@ -145,7 +145,7 @@ jobs:
             # Create a pull request for the merge conflicts
             gh pr create \
               --base main-v3 \
-              --head "$TEMP_BRANCH" \
+              --head "$MERGE_BRANCH_NAME" \
               --title "Merge conflicts detected - manual resolution needed" \
               --body "Merge conflicts occurred while attempting to merge changes from main to main-v3. Please resolve them in this PR."
 
