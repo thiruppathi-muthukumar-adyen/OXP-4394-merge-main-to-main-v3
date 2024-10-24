@@ -126,20 +126,21 @@ jobs:
           git push origin "$MERGE_BRANCH_NAME"
           echo "MERGE_BRANCH_NAME=$MERGE_BRANCH_NAME" >> $GITHUB_ENV
 
+
       - name: Handle PR creation or clean merge
-        run: |        
+        run: |
           # Fetch the latest changes from both main and main-v3 branches
           git fetch origin main-v3
-
+          
           # Checkout the main-v3 branch
           git checkout main-v3
-
+          
           # Attempt to merge main into main-v3
           if git merge "${{ env.MERGE_BRANCH_NAME }}" --no-commit --no-ff; then
             # Check the status of the merge to see if there are changes to commit
-            if [ "$(git diff --stat --cached)" != "" && "${{ env.MULTIPLE_OPEN_PRS }}" == "false" ]; then
+            if [[ "$(git diff --stat --cached)" != "" && "${{ env.MULTIPLE_OPEN_PRS }}" == "false" ]]; then
               echo "⏩ Changes detected, proceeding with direct merge."
-              git commit -m "Merging changes[${{ env.COMMIT_HASH }}] from ${{ env.MERGE_BRANCH_NAME }} to main-v3"
+              git commit -m "Merging changes [${{ env.COMMIT_HASH }}] from ${{ env.MERGE_BRANCH_NAME }} to main-v3"
               git push origin main-v3
               echo "✅ Successfully merged to main-v3"
             else
@@ -152,26 +153,39 @@ jobs:
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
-            PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.
-            Please resolve the conflicts.
-            "
-            PR_DESCRIPTION=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "Depends on the PRs: ${{ env.OPEN_PRS_FOR_MAIN_V3 }}" || echo "")
-
+          
+            # Construct the PR description based on whether there are multiple open PRs
+            if [[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]]; then
+              # Replace commas with ", #" and prepend "#" to each PR number
+              PR_DESCRIPTION="Depends on the PRs: $(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | sed 's/,/, #/g' | sed 's/^/#/')"
+            else
+              PR_DESCRIPTION=""
+            fi
+          
             # Set the draft flag based on MULTIPLE_OPEN_PRS
-            DRAFT_FLAG=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--draft" || echo "")
+            DRAFT_FLAG=$([[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]] && echo "--draft" || echo "")
             echo "DRAFT_FLAG: $DRAFT_FLAG"
           
             # Create a pull request for the merge conflicts
-            gh pr create \
+          
+            # Ensure the variables are properly sanitized for use in the command
+            echo "MERGE_BRANCH_URL: $MERGE_BRANCH_URL"
+            echo "PR_DESCRIPTION: $PR_DESCRIPTION"
+            MERGE_BRANCH_URL_SAFE=$(echo "$MERGE_BRANCH_URL" | sed 's/"/\\"/g')   # Escape double quotes
+            PR_DESCRIPTION_SAFE=$(echo "$PR_DESCRIPTION" | sed 's/"/\\"/g')       # Escape double quotes
+          
+            echo "MERGE_BRANCH_URL_SAFE: $MERGE_BRANCH_URL_SAFE"
+            echo "PR_DESCRIPTION_SAFE: $PR_DESCRIPTION_SAFE"
+          
+            gh pr create $DRAFT_FLAG \
               --base main-v3 \
-              --head ${{ env.MERGE_BRANCH_NAME }} \
-              --title "$PR_TITLE" \
-              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION"
-               $DRAFT_FLAG
-
+              --head "${{ env.MERGE_BRANCH_NAME }}" \
+              --title "Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3" \
+              --body "Merge conflicts occurred while attempting to merge changes ${{ env.COMMIT_HASH }} from $MERGE_BRANCH_URL_SAFE to main-v3. Please resolve the conflicts. $PR_DESCRIPTION_SAFE"
+          
             echo "✅ Pull request created for manual resolution."
           fi
+
 
       - name: Merge resolution instruction
         if: failure()
