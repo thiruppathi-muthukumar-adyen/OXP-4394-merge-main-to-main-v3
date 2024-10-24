@@ -1,4 +1,4 @@
-name: Main CI
+name: Merge main into main-v3
 
 on:
   workflow_dispatch:
@@ -68,6 +68,7 @@ jobs:
 
           # Get short commit hash (7 characters for brevity)
           COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
 
           # Check if there's a PR number to generate branch name
           if [ -n "${{ env.PR_NUMBER }}" ]; then
@@ -121,9 +122,9 @@ jobs:
           # Attempt to merge main into main-v3
           if git merge "${{ env.MERGE_BRANCH_NAME }}" --no-commit --no-ff; then
             # Check the status of the merge to see if there are changes to commit
-            if [ "$(git diff --stat --cached)" != "" ]; then
+            if [ "$(git diff --stat --cached)" != "" && "${{ env.MULTIPLE_OPEN_PRS }}" == "false" ]; then
               echo "⏩ Changes detected, proceeding with direct merge."
-              git commit -m "Merging changes from ${{ env.MERGE_BRANCH_NAME }} to main-v3"
+              git commit -m "Merging changes[${{ env.COMMIT_HASH }}] from ${{ env.MERGE_BRANCH_NAME }} to main-v3"
               git push origin main-v3
               echo "✅ Successfully merged to main-v3"
             else
@@ -135,13 +136,20 @@ jobs:
           else
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
+            PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
+            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from ${{ env.MERGE_BRANCH_NAME }} to main-v3. \n\nPlease resolve the conflicts."
+            PR_DESCRIPTION=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "Depends on the PRs: ${{ env.OPEN_PRS_FOR_MAIN_V3 }}" || echo "")
 
+            # Set the draft flag based on MULTIPLE_OPEN_PRS
+            DRAFT_FLAG=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--draft" || echo "")
+  
             # Create a pull request for the merge conflicts
             gh pr create \
               --base main-v3 \
               --head ${{ env.MERGE_BRANCH_NAME }} \
-              --title "Merge conflicts detected - manual resolution needed" \
-              --body "Merge conflicts occurred while attempting to merge changes from main to main-v3. Please resolve them in this PR."
+              --title "$PR_TITLE" \
+              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE \n\n $PR_DESCRIPTION"
+               $DRAFT_FLAG
 
             echo "✅ Pull request created for manual resolution."
           fi
