@@ -152,9 +152,7 @@ jobs:
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
-            PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.Please resolve the conflicts."
-            
+           
             # Construct the PR description based on whether there are multiple open PRs
             PR_DESCRIPTION=$(
               if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
@@ -166,17 +164,17 @@ jobs:
             )
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--draft" || echo "")
-            echo "DRAFT_FLAG: $DRAFT_FLAG"
+            echo "DRAFT_FLAG:" $DRAFT_FLAG
           
             # Create a pull request for the merge conflicts
           
-            echo "gh pr create $DRAFT_FLAG --base main-v3 --head ${env.MERGE_BRANCH_NAME} --title \"$PR_TITLE\" --body \"$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION\""
+            echo "gh pr create ${$DRAFT_FLAG} --base main-v3 --head ${env.MERGE_BRANCH_NAME} --title \"$PR_TITLE\" --body \"$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION\""
 
             gh pr create $DRAFT_FLAG \
             --base main-v3 \
             --head "${{ env.MERGE_BRANCH_NAME }}" \
-            --title "$PR_TITLE" \
-            --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION"
+            --title "Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3" \
+            --body "Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.Please resolve the conflicts. $PR_DESCRIPTION"
           
             echo "✅ Pull request created for manual resolution."
           fi
