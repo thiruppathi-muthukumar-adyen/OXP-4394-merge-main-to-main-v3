@@ -61,23 +61,23 @@ jobs:
           # Check if OPEN_PRS is empty or null and handle appropriately
           if [[ "$OPEN_PRS" == "[]" || -z "$OPEN_PRS" ]]; then
             echo "No open PRs targeting main-v3."
-            # Set OPEN_PRS_FOR_MAIN_V3 to an empty JSON array
-            echo "OPEN_PRS_FOR_MAIN_V3=[]" >> $GITHUB_ENV
-            echo "OPEN_PR_COUNT=0" >> $GITHUB_ENV
+            # Set OPEN_PRS_FOR_MAIN_V3 to an empty string
+            echo "OPEN_PRS_FOR_MAIN_V3=" >> $GITHUB_ENV
             echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
           else
-            # If there are open PRs, format and store them
-            echo "OPEN_PRS_FOR_MAIN_V3: [$OPEN_PRS]"
-            echo "OPEN_PRS_FOR_MAIN_V3=[$OPEN_PRS]" >> $GITHUB_ENV
-          
-            # Count the number of open PRs
-            OPEN_PR_COUNT=$(echo "$OPEN_PRS" | jq -r 'length')
-            echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
-            echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
+            # Convert the space-separated list into an array, sort it, and join it with commas
+            OPEN_PRS_COMMA_SEPARATED=$(echo "$OPEN_PRS" | tr ' ' '\n' | sort -n | tr '\n' ',' | sed 's/,$//')
 
+            # Log the formatted OPEN_PRS_COMMA_SEPARATED for debugging purposes
+            echo "OPEN_PRS_COMMA_SEPARATED: $OPEN_PRS_COMMA_SEPARATED"
+          
+            # Set OPEN_PRS_FOR_MAIN_V3 to the properly formatted string
+            echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS_COMMA_SEPARATED" >> $GITHUB_ENV
+          
             # Check if there are multiple open PRs
+            OPEN_PR_COUNT=$(echo "$OPEN_PRS_COMMA_SEPARATED" | tr ',' '\n' | wc -l)
             if [[ "$OPEN_PR_COUNT" -gt 1 ]]; then
-              echo "Multiple open PRs found, proceeding to create a draft PR."
+              echo "Multiple open PRs found, setting flag to true."
               echo "MULTIPLE_OPEN_PRS=true" >> $GITHUB_ENV
             else
               echo "Only one or no open PRs found."
@@ -88,8 +88,8 @@ jobs:
           # Log the final outputs for verification
           echo "FINAL OUTPUTS:"
           echo "OPEN_PRS_FOR_MAIN_V3=${{ env.OPEN_PRS_FOR_MAIN_V3 }}"
-          echo "OPEN_PR_COUNT=${{ env.OPEN_PR_COUNT }}"
           echo "MULTIPLE_OPEN_PRS=${{ env.MULTIPLE_OPEN_PRS }}"
+
 
       - name: Create a new branch for merge
         id: create-branch
@@ -153,18 +153,21 @@ jobs:
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
             PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.$'\n' Please resolve the conflicts."
+            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.
+            Please resolve the conflicts.
+            "
             PR_DESCRIPTION=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "Depends on the PRs: ${{ env.OPEN_PRS_FOR_MAIN_V3 }}" || echo "")
 
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--draft" || echo "")
-  
+            echo "DRAFT_FLAG: $DRAFT_FLAG"
+          
             # Create a pull request for the merge conflicts
             gh pr create \
               --base main-v3 \
               --head ${{ env.MERGE_BRANCH_NAME }} \
               --title "$PR_TITLE" \
-              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $'\n' $PR_DESCRIPTION"
+              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION"
                $DRAFT_FLAG
 
             echo "✅ Pull request created for manual resolution."
