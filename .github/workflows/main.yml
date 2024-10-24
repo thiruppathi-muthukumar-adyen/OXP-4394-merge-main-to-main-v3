@@ -113,22 +113,25 @@ jobs:
       - name: Handle PR creation or clean merge
         run: |        
           # Fetch the latest changes from both main and main-v3 branches
-          git fetch origin main main-v3
+          git fetch origin main-v3
 
           # Checkout the main-v3 branch
           git checkout main-v3
 
           # Attempt to merge main into main-v3
-          if git merge origin/main --no-commit --no-ff; then
+          if git merge "${{ env.MERGE_BRANCH_NAME }}" --no-commit --no-ff; then
             # Check the status of the merge to see if there are changes to commit
             if [ "$(git diff --stat --cached)" != "" ]; then
               echo "⏩ Changes detected, proceeding with direct merge."
-              git commit -m "Merging changes from main to main-v3"
+              git commit -m "Merging changes from ${{ env.MERGE_BRANCH_NAME }} to main-v3"
               git push origin main-v3
               echo "✅ Successfully merged to main-v3"
             else
               echo "ℹ️ No changes to merge; nothing to commit."
             fi
+            # Delete the temporary branch after successful merge or no changes
+            git push origin --delete "${{ env.MERGE_BRANCH_NAME }}"
+            echo "🧹 Temporary branch ${{ env.MERGE_BRANCH_NAME }} deleted successfully."
           else
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
