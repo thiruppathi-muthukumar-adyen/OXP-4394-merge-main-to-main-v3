@@ -111,10 +111,7 @@ jobs:
           echo "MULTIPLE_OPEN_PRS: ${{ env.MULTIPLE_OPEN_PRS }}"
 
       - name: Handle PR creation or clean merge
-        run: |
-          git config --global user.name "$USER_NAME"
-          git config --global user.email "$USER_EMAIL"
-          
+        run: |        
           # Fetch the latest changes from both main and main-v3 branches
           git fetch origin main main-v3
 
