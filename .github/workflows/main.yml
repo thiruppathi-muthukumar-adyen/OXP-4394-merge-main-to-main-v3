@@ -53,7 +53,7 @@ jobs:
         id: list-open-prs
         run: |
           # Fetch all open PRs targeting main-v3 from main
-          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
+          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {prNumber, prTitle}')
           echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS"
           echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
 
@@ -95,7 +95,8 @@ jobs:
       - name: Determine number of open PRs
         id: check-prs
         run: |
-          OPEN_PR_COUNT=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '. | length')
+          OPEN_PRS=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '.')
+          OPEN_PR_COUNT=$(echo "$OPEN_PRS" | jq -r '. | length')
           echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
           echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
 
