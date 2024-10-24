@@ -49,13 +49,47 @@ jobs:
           echo "PR_NUMBER: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
 
-      - name: List all open PRs to main-v3
-        id: list-open-prs
+      - name: List, Count, and Check Open PRs to main-v3
+        id: list-count-check-prs
         run: |
-          # Fetch all open PRs targeting main-v3 from main
-          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
-          echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS"
-          echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
+          # Fetch all open PR numbers targeting main-v3 from main
+          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number --jq '.[].number')
+
+          # Log the raw OPEN_PRS output for debugging purposes
+          echo "RAW OPEN_PRS: $OPEN_PRS"
+
+          # Check if OPEN_PRS is empty or null and handle appropriately
+          if [[ "$OPEN_PRS" == "[]" || -z "$OPEN_PRS" ]]; then
+            echo "No open PRs targeting main-v3."
+            # Set OPEN_PRS_FOR_MAIN_V3 to an empty JSON array
+            echo "OPEN_PRS_FOR_MAIN_V3=[]" >> $GITHUB_ENV
+            echo "OPEN_PR_COUNT=0" >> $GITHUB_ENV
+            echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
+          else
+            # If there are open PRs, format and store them
+            echo "OPEN_PRS_FOR_MAIN_V3: [$OPEN_PRS]"
+            echo "OPEN_PRS_FOR_MAIN_V3=[$OPEN_PRS]" >> $GITHUB_ENV
+          
+            # Count the number of open PRs
+            OPEN_PR_COUNT=$(echo "$OPEN_PRS" | jq -r 'length')
+            echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
+            echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
+
+            # Check if there are multiple open PRs
+            if [[ "$OPEN_PR_COUNT" -gt 1 ]]; then
+              echo "Multiple open PRs found, proceeding to create a draft PR."
+              echo "MULTIPLE_OPEN_PRS=true" >> $GITHUB_ENV
+            else
+              echo "Only one or no open PRs found."
+              echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
+            fi
+          fi
+
+          # Log the final outputs for verification
+          echo "FINAL OUTPUTS:"
+          echo "OPEN_PRS_FOR_MAIN_V3=${{ env.OPEN_PRS_FOR_MAIN_V3 }}"
+          echo "OPEN_PR_COUNT=${{ env.OPEN_PR_COUNT }}"
+          echo "MULTIPLE_OPEN_PRS=${{ env.MULTIPLE_OPEN_PRS }}"
 
       - name: Create a new branch for merge
         id: create-branch
@@ -92,25 +126,6 @@ jobs:
           git push origin "$MERGE_BRANCH_NAME"
           echo "MERGE_BRANCH_NAME=$MERGE_BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Determine number of open PRs
-        id: check-prs
-        run: |
-          OPEN_PR_COUNT=$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | jq -r '. | length')
-          echo "OPEN_PR_COUNT: $OPEN_PR_COUNT"
-          echo "OPEN_PR_COUNT=$OPEN_PR_COUNT" >> $GITHUB_ENV
-
-      - name: Check for multiple open PRs
-        id: check-multiple-prs
-        run: |
-          if [ ${{ env.OPEN_PR_COUNT }} -gt 1 ]; then
-            echo "Multiple open PRs found, proceeding to create a draft PR."
-            echo "MULTIPLE_OPEN_PRS=true" >> $GITHUB_ENV
-          else
-            echo "Only one or no open PRs found."
-            echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
-          fi
-          echo "MULTIPLE_OPEN_PRS: ${{ env.MULTIPLE_OPEN_PRS }}"
-
       - name: Handle PR creation or clean merge
         run: |        
           # Fetch the latest changes from both main and main-v3 branches
@@ -136,8 +151,9 @@ jobs:
           else
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
+            MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
             PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from ${{ env.MERGE_BRANCH_NAME }} to main-v3. \n\nPlease resolve the conflicts."
+            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.$'\n' Please resolve the conflicts."
             PR_DESCRIPTION=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "Depends on the PRs: ${{ env.OPEN_PRS_FOR_MAIN_V3 }}" || echo "")
 
             # Set the draft flag based on MULTIPLE_OPEN_PRS
@@ -148,7 +164,7 @@ jobs:
               --base main-v3 \
               --head ${{ env.MERGE_BRANCH_NAME }} \
               --title "$PR_TITLE" \
-              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE \n\n $PR_DESCRIPTION"
+              --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $'\n' $PR_DESCRIPTION"
                $DRAFT_FLAG
 
             echo "✅ Pull request created for manual resolution."
