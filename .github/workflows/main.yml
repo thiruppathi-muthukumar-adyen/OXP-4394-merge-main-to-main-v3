@@ -26,8 +26,12 @@ jobs:
             USER_NAME="${{ github.actor }}"
             USER_EMAIL="${{ github.actor }}@users.noreply.github.com"  # Default email format for direct commits
           fi
+          echo "USER_NAME=$USER_NAME" >> $GITHUB_ENV
+          echo "USER_EMAIL=$USER_EMAIL" >> $GITHUB_ENV
+          
           git config --global user.name "$USER_NAME"
           git config --global user.email "$USER_EMAIL"
+
 
       - name: Identify the PR number
         id: pr-info
@@ -67,25 +71,25 @@ jobs:
 
           # Check if there's a PR number to generate branch name
           if [ -n "${{ env.PR_NUMBER }}" ]; then
-            BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/pr-${{ env.PR_NUMBER }}"
+            MERGE_BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/pr-${{ env.PR_NUMBER }}"
           else
             TIMESTAMP=$(date +'%Y%m%d-%H%M')
-            BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/${COMMIT_HASH}-${TIMESTAMP}"
+            MERGE_BRANCH_NAME="merge/main-v3/${AUTHOR_NAME}/${COMMIT_HASH}-${TIMESTAMP}"
           fi
 
           # Ensure branch name does not exceed 255 characters
-          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c1-$MAX_LENGTH)
+          MERGE_BRANCH_NAME=$(echo "$MERGE_BRANCH_NAME" | cut -c1-$MAX_LENGTH)
 
           # Delete existing branch if it already exists
-          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
-            echo "Branch $BRANCH_NAME already exists. Deleting the branch to start fresh."
-            git push origin --delete "$BRANCH_NAME"
+          if git ls-remote --exit-code --heads origin "$MERGE_BRANCH_NAME"; then
+            echo "Branch $MERGE_BRANCH_NAME already exists. Deleting the branch to start fresh."
+            git push origin --delete "$MERGE_BRANCH_NAME"
           fi
           
           # Create and push the new branch
-          git checkout -b "$BRANCH_NAME"
-          git push origin "$BRANCH_NAME"
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          git checkout -b "$MERGE_BRANCH_NAME"
+          git push origin "$MERGE_BRANCH_NAME"
+          echo "MERGE_BRANCH_NAME=$MERGE_BRANCH_NAME" >> $GITHUB_ENV
 
       - name: Determine number of open PRs
         id: check-prs
@@ -129,11 +133,14 @@ jobs:
             # If there are merge conflicts, notify and create a PR for manual resolution
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             # Create a temporary branch for the PR
-            TEMP_BRANCH="conflict-resolution-branch"
+            TEMP_BRANCH="resolve-conflict-${{ env.MERGE_BRANCH_NAME }}"
             git checkout -b "$TEMP_BRANCH"
 
             # Push the temporary branch to the remote
             git push origin "$TEMP_BRANCH"
+          
+            git config --global user.name "$USER_NAME"
+            git config --global user.email "$USER_EMAIL"
 
             # Create a pull request for the merge conflicts
             gh pr create \
@@ -148,4 +155,4 @@ jobs:
       - name: Merge resolution instruction
         if: failure()
         run: |
-          echo "⛙ Merge conflicts must be resolved manually. PR created for branch ${{ env.BRANCH_NAME }}."
+          echo "⛙ Merge conflicts must be resolved manually. PR created for branch ${{ env.MERGE_BRANCH_NAME }}."
