@@ -10,6 +10,8 @@ jobs:
   merge-pr-to-main-v3:
     name: Merge the PR into main-v3
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout the PR branch
         uses: actions/checkout@v3
@@ -49,8 +51,6 @@ jobs:
 
       - name: List all open PRs to main-v3
         id: list-open-prs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch all open PRs targeting main-v3 from main
           OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {number, title}')
