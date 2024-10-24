@@ -173,15 +173,11 @@ jobs:
             echo "gh pr create $DRAFT_FLAG --base main-v3 --head ${env.MERGE_BRANCH_NAME} --title \"$PR_TITLE\" --body \"$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION\""
 
             gh pr create $DRAFT_FLAG \
-              --base main-v3 \
-              --head "${{ env.MERGE_BRANCH_NAME }}" \
-              --title "$PR_TITLE" \
-              --body "$(cat <<EOF
-              $PR_COMMIT_BODY_GENERIC_MESSAGE
-              $PR_DESCRIPTION
-              EOF
-              )"
-
+            --base main-v3 \
+            --head "${{ env.MERGE_BRANCH_NAME }}" \
+            --title "$PR_TITLE" \
+            --body "$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION"
+          
             echo "✅ Pull request created for manual resolution."
           fi
 
