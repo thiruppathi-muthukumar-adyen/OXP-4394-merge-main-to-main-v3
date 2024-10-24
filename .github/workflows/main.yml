@@ -53,9 +53,18 @@ jobs:
         id: list-open-prs
         run: |
           # Fetch all open PRs targeting main-v3 from main
-          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title --jq '.[] | {prNumber, prTitle}')
-          echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS"
-          echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
+          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number,title)
+          echo "OPEN_PRS: $OPEN_PRS"
+          
+          # Check if OPEN_PRS is empty or null
+          if [[ "$OPEN_PRS" == "[]" || "$OPEN_PRS" == "" ]]; then
+            echo "No open PRs targeting main-v3."
+            echo "OPEN_PRS_FOR_MAIN_V3=[]" >> $GITHUB_ENV
+          else
+            echo "OPEN_PRS_FOR_MAIN_V3: $OPEN_PRS"
+            echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS" >> $GITHUB_ENV
+          fi
+
 
       - name: Create a new branch for merge
         id: create-branch
