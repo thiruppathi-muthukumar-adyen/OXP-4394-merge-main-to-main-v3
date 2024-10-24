@@ -153,9 +153,7 @@ jobs:
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
             PR_TITLE="Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3"
-            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.
-            
-            Please resolve the conflicts."
+            PR_COMMIT_BODY_GENERIC_MESSAGE="Merge conflicts occurred while attempting to merge changes(${{ env.COMMIT_HASH }}) from $MERGE_BRANCH_URL to main-v3.Please resolve the conflicts."
             
             # Construct the PR description based on whether there are multiple open PRs
             PR_DESCRIPTION=$(
