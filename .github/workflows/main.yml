@@ -162,19 +162,22 @@ jobs:
                 echo ""
               fi
             )
+           
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--draft" || echo "")
             echo "DRAFT_FLAG:" $DRAFT_FLAG
           
             # Create a pull request for the merge conflicts
           
-            echo "gh pr create ${$DRAFT_FLAG} --base main-v3 --head ${env.MERGE_BRANCH_NAME} --title \"$PR_TITLE\" --body \"$PR_COMMIT_BODY_GENERIC_MESSAGE $PR_DESCRIPTION\""
+            # Ensure the variables are properly sanitized for use in the command
+            MERGE_BRANCH_URL_SAFE=$(echo "$MERGE_BRANCH_URL" | sed 's/"/\\"/g')   # Escape double quotes
+            PR_DESCRIPTION_SAFE=$(echo "$PR_DESCRIPTION" | sed 's/"/\\"/g')       # Escape double quotes
 
             gh pr create $DRAFT_FLAG \
             --base main-v3 \
             --head "${{ env.MERGE_BRANCH_NAME }}" \
             --title "Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3" \
-            --body "Merge conflicts occurred while attempting to merge changes ${{ env.COMMIT_HASH }} from $MERGE_BRANCH_URL to main-v3. Please resolve the conflicts. $PR_DESCRIPTION"
+            --body "Merge conflicts occurred while attempting to merge changes ${{ env.COMMIT_HASH }} from $MERGE_BRANCH_URL_SAFE to main-v3. Please resolve the conflicts. $PR_DESCRIPTION_SAFE"
           
             echo "✅ Pull request created for manual resolution."
           fi
