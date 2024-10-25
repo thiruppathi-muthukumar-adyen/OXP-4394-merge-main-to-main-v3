@@ -149,10 +149,10 @@ jobs:
           
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]] && echo "--draft" || echo "")
+            LABELS=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--label bug" || echo "")
             echo "DRAFT_FLAG: $DRAFT_FLAG"
-          
-            # Create a pull request for the merge conflicts
-          
+            echo "LABELS: $LABELS"
+                    
             # Ensure the variables are properly sanitized for use in the command
             echo "MERGE_BRANCH_URL: $MERGE_BRANCH_URL"
             echo "PR_DESCRIPTION: $PR_DESCRIPTION"
@@ -168,11 +168,11 @@ jobs:
 
             # Debug print to ensure PR_BODY is formatted correctly
             echo "PR_BODY: $PR_BODY"
-
             echo "MERGE_BRANCH_URL_SAFE: $MERGE_BRANCH_URL_SAFE"
             echo "PR_DESCRIPTION_SAFE: $PR_DESCRIPTION_SAFE"
-          
-            gh pr create $DRAFT_FLAG \
+
+            # Create a pull request for the merge conflicts
+            gh pr create $DRAFT_FLAG $LABELS \
               --base main-v3 \
               --head "${{ env.MERGE_BRANCH_NAME }}" \
               --title "Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3" \
