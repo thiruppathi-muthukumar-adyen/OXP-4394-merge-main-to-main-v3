@@ -149,7 +149,7 @@ jobs:
           
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]] && echo "--draft" || echo "")
-            LABELS=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--label 'DO NOT MERGE'" || echo "")
+            LABELS=$([ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ] && echo "--label '\"DO NOT MERGE\"'" || echo "")
             echo "DRAFT_FLAG: $DRAFT_FLAG"
             echo "LABELS: $LABELS"
                     
