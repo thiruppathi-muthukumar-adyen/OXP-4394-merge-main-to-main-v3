@@ -51,45 +51,30 @@ jobs:
 
       - name: List, Count, and Check Open PRs to main-v3
         id: list-count-check-prs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Fetch all open PR numbers targeting main-v3 from main
-          OPEN_PRS=$(gh pr list --base main-v3 --state open --json number --jq '.[].number')
-
-          # Log the raw OPEN_PRS output for debugging purposes
-          echo "RAW OPEN_PRS: $OPEN_PRS"
-
-          # Check if OPEN_PRS is empty or null and handle appropriately
-          if [[ "$OPEN_PRS" == "[]" || -z "$OPEN_PRS" ]]; then
-            echo "No open PRs targeting main-v3."
-            # Set OPEN_PRS_FOR_MAIN_V3 to an empty string
-            echo "OPEN_PRS_FOR_MAIN_V3=" >> $GITHUB_ENV
-            echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
+          # Fetch open PRs targeting main-v3 branch as JSON
+          RAW_OPEN_PRS=$(gh pr list --base main-v3 --state open --json number --jq '.[].number' || echo "[]")
+          
+          # Check if RAW_OPEN_PRS is empty or "[]", assign default values if so
+          if [[ -z "$RAW_OPEN_PRS" || "$RAW_OPEN_PRS" == "[]" ]]; then
+            echo "No open PRs found for main-v3. Setting default values."
+            OPEN_PRS_FOR_MAIN_V3=""
+            MULTIPLE_OPEN_PRS="false"
           else
-            # Convert the space-separated list into an array, sort it, and join it with commas
-            OPEN_PRS_COMMA_SEPARATED=$(echo "$OPEN_PRS" | tr ' ' '\n' | sort -n | tr '\n' ',' | sed 's/,$//')
-
-            # Log the formatted OPEN_PRS_COMMA_SEPARATED for debugging purposes
-            echo "OPEN_PRS_COMMA_SEPARATED: $OPEN_PRS_COMMA_SEPARATED"
+            # Sort PR numbers, remove newlines, and create a comma-separated string
+            OPEN_PRS_FOR_MAIN_V3=$(echo "$RAW_OPEN_PRS" | tr '\n' ',' | sed 's/,$//' | sort -n)
           
-            # Set OPEN_PRS_FOR_MAIN_V3 to the properly formatted string
-            echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS_COMMA_SEPARATED" >> $GITHUB_ENV
-          
-            # Check if there are multiple open PRs
-            OPEN_PR_COUNT=$(echo "$OPEN_PRS_COMMA_SEPARATED" | tr ',' '\n' | wc -l)
-            if [[ "$OPEN_PR_COUNT" -gt 1 ]]; then
-              echo "Multiple open PRs found, setting flag to true."
-              echo "MULTIPLE_OPEN_PRS=true" >> $GITHUB_ENV
-            else
-              echo "Only one or no open PRs found."
-              echo "MULTIPLE_OPEN_PRS=false" >> $GITHUB_ENV
-            fi
+            # Count number of PRs based on comma-separated values and set MULTIPLE_OPEN_PRS
+            OPEN_PR_COUNT=$(echo "$OPEN_PRS_FOR_MAIN_V3" | tr -cd ',' | wc -c)
+            OPEN_PR_COUNT=$((OPEN_PR_COUNT + 1)) # Adding 1 because counts are one more than commas
+            MULTIPLE_OPEN_PRS=$([ "$OPEN_PR_COUNT" -gt 1 ] && echo "true" || echo "false")
           fi
-
-          # Log the final outputs for verification
-          echo "FINAL OUTPUTS:"
-          echo "OPEN_PRS_FOR_MAIN_V3=${{ env.OPEN_PRS_FOR_MAIN_V3 }}"
-          echo "MULTIPLE_OPEN_PRS=${{ env.MULTIPLE_OPEN_PRS }}"
-
+          
+          # Export final values to GitHub environment
+          echo "OPEN_PRS_FOR_MAIN_V3=$OPEN_PRS_FOR_MAIN_V3" >> $GITHUB_ENV
+          echo "MULTIPLE_OPEN_PRS=$MULTIPLE_OPEN_PRS" >> $GITHUB_ENV
 
       - name: Create a new branch for merge
         id: create-branch
