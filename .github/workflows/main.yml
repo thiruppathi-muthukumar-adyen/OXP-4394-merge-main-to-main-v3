@@ -51,8 +51,6 @@ jobs:
 
       - name: List, Count, and Check Open PRs to main-v3
         id: list-count-check-prs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Fetch open PRs targeting main-v3 branch as JSON
           RAW_OPEN_PRS=$(gh pr list --base main-v3 --state open --json number --jq '.[].number' || echo "[]")
@@ -139,13 +137,15 @@ jobs:
             echo "🚫 Merge conflicts detected, creating PR for manual resolution."
             MERGE_BRANCH_URL="https://github.com/${{ github.repository }}/tree/${{ env.MERGE_BRANCH_NAME }}"
           
-            # Construct the PR description based on whether there are multiple open PRs
-            if [[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]]; then
-              # Replace commas with ", #" and prepend "#" to each PR number
-              PR_DESCRIPTION="Depends on the PRs: $(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | sed 's/,/, #/g' | sed 's/^/#/')"
-            else
-              PR_DESCRIPTION=""
-            fi
+            # Format the PR description as a bullet list if multiple open PRs exist
+            PR_DESCRIPTION=$(
+              if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
+                # Format PR numbers with bullets and newlines
+                echo -e "Depends on the PRs:\n$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | sed 's/,/\n/g' | sed 's/^/- #/')"
+              else
+                echo ""
+              fi
+            )
           
             # Set the draft flag based on MULTIPLE_OPEN_PRS
             DRAFT_FLAG=$([[ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]] && echo "--draft" || echo "")
@@ -159,6 +159,16 @@ jobs:
             MERGE_BRANCH_URL_SAFE=$(echo "$MERGE_BRANCH_URL" | sed 's/"/\\"/g')   # Escape double quotes
             PR_DESCRIPTION_SAFE=$(echo "$PR_DESCRIPTION" | sed 's/"/\\"/g')       # Escape double quotes
           
+            # Construct the PR body with formatted text and bullet list for dependencies
+            PR_BODY=$(printf "Merge conflicts occurred while attempting to merge changes %s from [%s](%s) to main-v3.\n\nPlease resolve the conflicts.\n\n%s" \
+                            "${{ env.COMMIT_HASH }}" \
+                            "${{ env.MERGE_BRANCH_NAME }}" \
+                            "$MERGE_BRANCH_URL_SAFE" \
+                            "$PR_DESCRIPTION_SAFE")
+
+            # Debug print to ensure PR_BODY is formatted correctly
+            echo "PR_BODY: $PR_BODY"
+
             echo "MERGE_BRANCH_URL_SAFE: $MERGE_BRANCH_URL_SAFE"
             echo "PR_DESCRIPTION_SAFE: $PR_DESCRIPTION_SAFE"
           
@@ -166,11 +176,10 @@ jobs:
               --base main-v3 \
               --head "${{ env.MERGE_BRANCH_NAME }}" \
               --title "Resolve conflicts while merging ${{ env.MERGE_BRANCH_NAME }} into main_v3" \
-              --body "Merge conflicts occurred while attempting to merge changes ${{ env.COMMIT_HASH }} from [${{ env.MERGE_BRANCH_NAME }}](${MERGE_BRANCH_URL_SAFE}) to main-v3. Please resolve the conflicts. $PR_DESCRIPTION_SAFE"
+              --body "$PR_BODY"
 
             echo "✅ Pull request created for manual resolution."
           fi
-
 
       - name: Merge resolution instruction
         if: failure()
