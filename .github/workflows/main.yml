@@ -140,8 +140,8 @@ jobs:
             # Format the PR description as a bullet list if multiple open PRs exist
             PR_DESCRIPTION=$(
               if [ "${{ env.MULTIPLE_OPEN_PRS }}" == "true" ]; then
-                # Format PR numbers with bullets and newlines
-                echo -e "Depends on the PRs:\n$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | sed 's/,/\n/g' | sed 's/^/- #/')"
+                # Sort PR numbers in ascending order, format with bullets and newlines
+                echo -e "Depends on the PRs:\n$(echo "${{ env.OPEN_PRS_FOR_MAIN_V3 }}" | tr ',' '\n' | sort -n | sed 's/^/- #/')"
               else
                 echo ""
               fi
