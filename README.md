@@ -2,6 +2,7 @@
 Sample repo to test OXP-4394
 
 ## Main Branch PR Changes
+- Commit 2 from a `PR`
 - Commit 1 from a `PR`
 
 ## Main Branch Changes
