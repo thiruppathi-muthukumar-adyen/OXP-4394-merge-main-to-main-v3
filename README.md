@@ -10,6 +10,7 @@ Sample repo to test OXP-4394
 - Commit 1 from a `PR`
 
 ## Main Branch Changes
+- Commit 9 from `main` (this will be in a PR)
 - Commit 8 from `main`
 - Commit 7 from `main`
 - Commit 6 from `main`
