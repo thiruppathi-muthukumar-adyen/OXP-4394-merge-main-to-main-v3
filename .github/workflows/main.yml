@@ -42,9 +42,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
           else
-            # Extract PR number from the merge commit title if it's a push event
-            PR_NUMBER=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' || echo "")
-            PR_NUMBER=${PR_NUMBER#"#"}  # Remove '#' character
+            PR_NUMBER=""
           fi
           echo "PR_NUMBER: $PR_NUMBER"
           echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
